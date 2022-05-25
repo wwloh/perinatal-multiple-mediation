@@ -9,8 +9,7 @@ if (!grepl("apple",sessionInfo()[[1]]$platform)) {
 (seed <- as.integer(args[1]))
 
 nseeds <- 2500
-m1y <- data.frame("M1_name"=c("SGA1","SGA","SGA1"),
-                  "Y_name"=c("PND","PND","SB"))
+m1y <- expand.grid("M1_name"=c("SGA","SGA1"),"Y_name"=c("PND","SB"))
 m1y <- m1y[rep(1:nrow(m1y),each=nseeds),]
 
 (M1_name <- m1y[seed,"M1_name"])
@@ -23,11 +22,13 @@ if (M1_name=="SGA" && Y_name=="PND") {
   Data_agg <- Data_agg_SGA_PND
 } else if (M1_name=="SGA1" && Y_name=="PND") {
   Data_agg <- Data_agg_SGA1_PND
+} else if (M1_name=="SGA" && Y_name=="SB") {
+  Data_agg <- Data_agg_SGA_SB
 } else if (M1_name=="SGA1" && Y_name=="SB") {
   Data_agg <- Data_agg_SGA1_SB
 }
 setkey(Data_agg)
-rm(Data_agg_SGA_PND,Data_agg_SGA1_PND,Data_agg_SGA1_SB)
+rm(Data_agg_SGA_PND,Data_agg_SGA1_PND,Data_agg_SGA_SB,Data_agg_SGA1_SB)
 
 OneNEmodelEstimator <- function(data) {
   # logistic regression model for binary M1
@@ -112,6 +113,27 @@ OneNEmodelEstimator <- function(data) {
   pA_hat <- predict.glm(fitA,newdata=dat2,type="response")
   W2 <- W2/dbinom(dat2$A, size=1, prob=pA_hat)
   rm(pA_hat)
+  if (FALSE) {
+    # boxplots of mediator weights
+    W1.unwt <- data.frame("W1"=rep(W1,times=dat1$WGT),
+                          "A"=rep(dat1$A,times=dat1$WGT))
+    png("manu/mm-abpl-pnd-weights-m1.png",width=8,height=6,units="in",res=300)
+    boxplot(W1~A,data=W1.unwt,
+            main="Weights using density for M1 (SGA births)",
+            xlab="Exposure (Placental Abruption)",
+            ylab="Weight")
+    dev.off()
+    
+    png("manu/mm-abpl-pnd-weights-m2.png",width=8,height=6,units="in",res=300)
+    W2.unwt <- data.frame("W2"=rep(W2,times=dat2$WGT),
+                          "A"=rep(dat2$A,times=dat2$WGT))
+    boxplot(W2~A,data=W2.unwt,
+            main="Weights using density for M2 (Preterm delivery)",
+            xlab="Exposure (Placental Abruption)",
+            ylab="Weight")
+    dev.off()
+  }
+  
   ## multiply by aggregated weights
   W1 <- W1*dat1$WGT
   W2 <- W2*dat2$WGT
@@ -128,6 +150,9 @@ OneNEmodelEstimator <- function(data) {
   fit_mod[[2]] <- glm(Yhat ~ a0 * a1 * a2,
                       family = binomial("logit"), data = dat2, weights = W2)
   names(fit_mod) <- paste0("fit",c("M1","M2"))
+  
+  W1.unique
+  W2.unique
   
   return( unlist(lapply(fit_mod,coef)) )
 }
